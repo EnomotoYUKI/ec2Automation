@@ -1,14 +1,3 @@
-import subprocess
-import boto3
-import os 
-from os.path import dirname,join
-from dotenv import load_dotenv
-
-load_dotenv(verbose=True)
-dotenv_path = join(dirname(__file__),".env")
-ACCESS_KEY = os.environ("ACCESS_KEY")
-SECRET_ACCESS_KEY = os.environ("SECRET_ACCESS_KEY")
-REGION = os.environ("REGION")
 
 #-------------------------------------------------------#
 # This Program is EC2 automation system.
@@ -17,80 +6,110 @@ REGION = os.environ("REGION")
 # EC2 instance by SSH.
 #
 # Author : EnomotoYUKI
-# Date : 2023.01.29
-# Version : 1.0
+# Date : 2023.01.30
+# Version : 1.1
 #
 # Feel free to modify this program.
+#-------------------------------------------------------#
+
+import subprocess
+import boto3
+import os 
+from os.path import dirname,join
+from dotenv import load_dotenv
+
+
+
+load_dotenv(verbose=True)
+dotenv_path = join(dirname(__file__),".env")
+ACCESS_KEY = os.environ.get("ACCESS_KEY")
+SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY")
+
 #---------------------SETTING  AREA----------------------#
 # PATHTERATERM : Write your Teratarm(ttermpro.exe)'s directry.
 # PATHOPENKEY : Write your openkey used by SSH 
 # nameWDB : Write shortcut name for webdb
 # nameNAGI : Write shortcut name for Nagios
+# host_path : Write host file path
 
 PATHTERATERM = r"D:\Program Files (x86)\teraterm\ttermpro.exe"
 PATHOPENKEY  = r"D:\Users\0enok\Documents\hb-intern-202301.pem"
 nameWDB = "WebDB"
 nameNAGI = "Nagios"
-local_path = "C:\Windows\System32\drivers\etc\hosts"
+yourname = "yuki"
+hostPath = "C:\Windows\System32\drivers\etc\hosts"
+
+# Setting access key and secret access key by .env file.
+# Detailed explain is written by README.txt.
+
+load_dotenv(verbose=True)
+dotenvPath = join(dirname(__file__),".env")
+ACCESS_KEY = os.environ.get("ACCESS_KEY")
+SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY")
+
 #------------------- SETTING AREA End -------------------# 
-def ec2Start_and_getIP():
-    ec2 = boto3.resource('ec2',
-                            aws_access_key_id=ACCESS_KEY,
-                            aws_secret_access_key=SECRET_ACCESS_KEY,
-                            region_name= "ap-northeast-1"
-                            )
 
-    instance_id_wdb = "i-0fc288937b1cf7852"
-    instance_id_nagi = "i-0715441d4fd135642"
+ec2 = boto3.resource('ec2',
+                        aws_access_key_id=ACCESS_KEY,
+                        aws_secret_access_key=SECRET_ACCESS_KEY,
+                        region_name= "ap-northeast-1"
+                        )
 
-    instance_wdb = ec2.Instance(instance_id_wdb)
-    instance_nagi = ec2.Instance(instance_id_nagi)
+class ec2Automation:
 
-    instance_wdb.start()
-    instance_nagi.start()
+    def __init__(self,id,nameInstance,domain):
+        self.instanceID = id
+        self.instance = ec2.Instance(self.instanceID)
+        self.instanceName = nameInstance
+        self.domain = domain
 
-    instance_wdb.wait_until_running()
-    instance_nagi.wait_until_running()
+    def startEC2(self):
 
-    ipWdb = instance_wdb.public_ip_address
-    ipNagi = instance_nagi.public_ip_address
+        self.instance.start()
+        self.instance.wait_until_running()
 
-    print(f"WebDB Groval IP: {ipWdb}")
-    print(f"Nagios Groval IP: {ipNagi}")
-    return ipWdb,ipNagi
+    def getEC2Address(self):
+        self.groIP = self.instance.public_ip_address
+        print(f"{self.instanceName} Groval IP Address : {self.groIP}")
 
-def write_localfile(wdb,nagi):
-    f = open(local_path,"w")
-    f.writelines([f"{wdb} yuki-webdb\n",f"{nagi} yuki-nagios"])
-    f.close()
-
-
-ipAdd = ec2Start_and_getIP()
-write_localfile(ipAdd[0],ipAdd[1])
-
-
-
-def setWSH(ipAdd,filName,pathTERA,pathOPENkey):
-    wshText = \
+    def makeTeratarmShortCut(self):
+        wshText = \
 f'Set shell = WScript.CreateObject("WScript.Shell")\n\
-fil =  "{filName}.lnk"\n\
+fil =  "{self.instanceName}.lnk"\n\
 Set shortCut = shell.CreateShortcut(fil)\n\
-shortCut.TargetPath = "{pathTERA}"\n\
-shortCut.Arguments = "{ipAdd}:22 /auth=publickey /user=ec2-user /keyfile={pathOPENkey}"\n\
+shortCut.TargetPath = "{PATHTERATERM}"\n\
+shortCut.Arguments = "{self.groIP}:22 /auth=publickey /user=ec2-user /keyfile={PATHOPENKEY}"\n\
 shortCut.Save'
-    return wshText
 
-def makeShortCut(wdbIP,nagiIP):
-    with open("wdbSC.vbs", mode = "w+") as wdbF:
-        wdbF.write(setWSH(wdbIP,nameWDB,PATHTERATERM,PATHOPENKEY))
+        with open(f"{self.instanceName}.vbs", mode = "w+") as t:
+            t.write(wshText)
+        subprocess.call(f'{self.instanceName}.vbs',shell = True)
 
-    with open("nagiSC.vbs" , mode = "w+") as nagiF:
-        nagiF.write(setWSH(nagiIP,nameNAGI,PATHTERATERM,PATHOPENKEY))
+    def changeHostFile(self):
+        flg = cont = 0
+        tx = f"{self.domain}\n"
+        with open(hostPath,"r") as h:
+            tmp = h.readlines()
 
-    subprocess.call('nagiSC.vbs',shell = True)
-    subprocess.call("wdbSC.vbs",shell = True)
+        for i in tmp:
+            if self.domain in i:
+                tmp[cont] = tx
+                flg = 1
+                if cont > 1: del tmp[cont]
+            cont += 1
+            if flg == 0:
+                tmp.append(tx)
 
+            with open(hostPath,"w") as h:
+                h.writelines(tmp)
+    
+    def ec2Automation(self):
+        self.startEC2()
+        self.getEC2Address()
+        self.makeTeratarmShortCut()
+        self.changeHostFile()
 
-ipAdd = ec2Start_and_getIP()
-write_localfile(ipAdd[0],ipAdd[1])
-makeShortCut("18.181.79.237","54.92.108.213")
+webdbIns = ec2Automation("i-0fc288937b1cf7852",nameWDB,"yuki-webdb")
+nagiosIns = ec2Automation("i-0715441d4fd135642",nameNAGI,"yuki-nagios")
+webdbIns.ec2Automation()
+nagiosIns.ec2Automation()
