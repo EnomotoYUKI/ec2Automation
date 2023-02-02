@@ -1,4 +1,3 @@
-
 #-------------------------------------------------------#
 # This Program is EC2 automation system.
 # It does get EC2's groval IP address, start EC2 instance
@@ -33,7 +32,8 @@ SECRET_ACCESS_KEY = os.environ.get("SECRET_ACCESS_KEY")
 # host_path : Write host file path
 
 PATHTERATERM = r"D:\Program Files (x86)\teraterm\ttermpro.exe"
-PATHOPENKEY  = r"D:\Users\0enok\Documents\hb-intern-202301.pem"
+PATHOPENKEY  = r"D:\Users\0enok\Document\hb-intern-202301.pem"
+PATHSHORTCUTDIR = r"C:\Users\0enok\Desktop"
 nameWDB = "WebDB"
 nameNAGI = "Nagios"
 yourname = "yuki"
@@ -75,19 +75,19 @@ class ec2Automation:
     def makeTeratarmShortCut(self):
         wshText = \
 f'Set shell = WScript.CreateObject("WScript.Shell")\n\
-fil =  "{self.instanceName}.lnk"\n\
+fil =  "{PATHSHORTCUTDIR}\{self.instanceName}.lnk"\n\
 Set shortCut = shell.CreateShortcut(fil)\n\
 shortCut.TargetPath = "{PATHTERATERM}"\n\
 shortCut.Arguments = "{self.groIP}:22 /auth=publickey /user=ec2-user /keyfile={PATHOPENKEY}"\n\
 shortCut.Save'
 
-        with open(f"{self.instanceName}.vbs", mode = "w+") as t:
+        with open(f"{self.instanceName}.vbs", mode = "w") as t:
             t.write(wshText)
         subprocess.call(f'{self.instanceName}.vbs',shell = True)
 
     def changeHostFile(self):
         flg = cont = 0
-        tx = f"{self.domain}\n"
+        tx = f"{self.groIP} {self.domain}\n"
         with open(hostPath,"r") as h:
             tmp = h.readlines()
 
@@ -111,5 +111,7 @@ shortCut.Save'
 
 webdbIns = ec2Automation("i-0fc288937b1cf7852",nameWDB,"yuki-webdb")
 nagiosIns = ec2Automation("i-0715441d4fd135642",nameNAGI,"yuki-nagios")
+dbIns = ec2Automation("i-0f4dc7507c315db19","DB","yuki-db")
 webdbIns.ec2Automation()
 nagiosIns.ec2Automation()
+dbIns.ec2Automation()
